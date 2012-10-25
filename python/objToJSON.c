@@ -129,6 +129,49 @@ static void *PyUnicodeToUTF8(JSOBJ _obj, JSONTypeContext *tc, void *outValue, si
     return PyString_AS_STRING(newObj);
 }
 
+static void *PyDateTimeToUTF8(JSOBJ _obj, JSONTypeContext *tc, void *outValue, size_t *_outLen)
+{
+    PyObject *obj = (PyObject *) _obj;
+    PyObject *newObj;
+    char buffer[24];
+    int y, m, d, h, mn, s, x;
+
+    y = PyDateTime_GET_YEAR(obj);
+    m = PyDateTime_GET_MONTH(obj);
+    d = PyDateTime_GET_DAY(obj);
+    h = PyDateTime_DATE_GET_HOUR(obj);
+    mn = PyDateTime_DATE_GET_MINUTE(obj);
+    s = PyDateTime_DATE_GET_SECOND(obj);
+
+    x = PyOS_snprintf(buffer, sizeof(buffer), "%04d-%02d-%02d %02d:%02d:%02d", y, m, d, h, mn, s);
+    newObj = PyString_FromStringAndSize(buffer, x);
+
+    GET_TC(tc)->newObj = newObj;
+
+    *_outLen = PyString_GET_SIZE(newObj);
+    return PyString_AS_STRING(newObj);
+}
+
+static void *PyDateToUTF8(JSOBJ _obj, JSONTypeContext *tc, void *outValue, size_t *_outLen)
+{
+    PyObject *obj = (PyObject *) _obj;
+    PyObject *newObj;
+    char buffer[24];
+    int y, m, d, x;
+
+    y = PyDateTime_GET_YEAR(obj);
+    m = PyDateTime_GET_MONTH(obj);
+    d = PyDateTime_GET_DAY(obj);
+
+    x = PyOS_snprintf(buffer, sizeof(buffer), "%04d-%02d-%02d", y, m, d);
+    newObj = PyString_FromStringAndSize(buffer, x);
+
+    GET_TC(tc)->newObj = newObj;
+
+    *_outLen = PyString_GET_SIZE(newObj);
+    return PyString_AS_STRING(newObj);
+}
+
 static void *PyDateTimeToINT64(JSOBJ _obj, JSONTypeContext *tc, void *outValue, size_t *_outLen)
 {
     PyObject *obj = (PyObject *) _obj;
@@ -544,14 +587,14 @@ void Object_beginTypeContext (JSOBJ _obj, JSONTypeContext *tc)
     if (PyDateTime_Check(obj))
     {
         PRINTMARK();
-        pc->PyTypeToJSON = PyDateTimeToINT64; tc->type = JT_LONG;
+        pc->PyTypeToJSON = PyDateTimeToUTF8; tc->type = JT_UTF8;
         return;
     }
     else 
     if (PyDate_Check(obj))
     {
         PRINTMARK();
-        pc->PyTypeToJSON = PyDateToINT64; tc->type = JT_LONG;
+        pc->PyTypeToJSON = PyDateToUTF8; tc->type = JT_UTF8;
         return;
     }
     else
