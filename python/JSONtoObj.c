@@ -113,8 +113,8 @@ PyObject* JSONToObj(PyObject* self, PyObject *args, PyObject *kwargs)
 {
     PyObject *ret;
     PyObject *sarg;
-	PyObject *arg;
-	PyObject *opreciseFloat = NULL;
+    PyObject *arg;
+    PyObject *opreciseFloat = NULL;
     JSONObjectDecoder decoder = 
     {
         Object_newString,
@@ -134,7 +134,7 @@ PyObject* JSONToObj(PyObject* self, PyObject *args, PyObject *kwargs)
         PyObject_Realloc
     };
 
-	decoder.preciseFloat = 0;
+    decoder.preciseFloat = 0;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|O", g_kwlist, &arg, &opreciseFloat))
     {
@@ -199,11 +199,11 @@ PyObject* JSONFileToObj(PyObject* self, PyObject *args, PyObject *kwargs)
     PyObject *read;
     PyObject *string;
     PyObject *result;
-	PyObject *file = NULL;
-	PyObject *argtuple;
+    PyObject *file = NULL;
+    PyObject *argtuple;
 
-	if (!PyArg_ParseTuple (args, "O", &file)) 
-	{
+    if (!PyArg_ParseTuple (args, "O", &file)) 
+    {
         return NULL;
     }
 
@@ -229,12 +229,12 @@ PyObject* JSONFileToObj(PyObject* self, PyObject *args, PyObject *kwargs)
         return NULL;
     }
 
-	argtuple = PyTuple_Pack(1, string);
+    argtuple = PyTuple_Pack(1, string);
 
     result = JSONToObj (self, argtuple, kwargs);
 
-	Py_XDECREF(argtuple);
-	Py_XDECREF(string);
+    Py_XDECREF(argtuple);
+    Py_XDECREF(string);
 
     if (result == NULL) {
         return NULL;

@@ -225,9 +225,9 @@ typedef struct __JSONObjectEncoder
     If true output will be ASCII with all characters above 127 encoded as \uXXXX. If false output will be UTF-8 or what ever charset strings are brought as */
     int forceASCII;
 
-	/*
-	If true, '<', '>', and '&' characters will be encoded as \u003c, \u003e, and \u0026, respectively. If false, no special encoding will be used. */
-	int encodeHTMLChars;
+    /*
+    If true, '<', '>', and '&' characters will be encoded as \u003c, \u003e, and \u0026, respectively. If false, no special encoding will be used. */
+    int encodeHTMLChars;
 
     /*
     Set to an error message if error occured */
@@ -288,7 +288,7 @@ typedef struct __JSONObjectDecoder
     char *errorStr;
     char *errorOffset;
 
-	int preciseFloat;
+    int preciseFloat;
 
 
 } JSONObjectDecoder;

@@ -66,7 +66,7 @@ typedef struct __TypeContext
     PyObject *itemValue;
     PyObject *itemName;
     PyObject *attrList;
-	PyObject *iterator;
+    PyObject *iterator;
 
     JSINT64 longValue;
 
@@ -87,10 +87,10 @@ struct PyDictIterState
 
 void initObjToJSON(void)
 {
-	PyObject* mod_decimal = PyImport_ImportModule("decimal");
-	type_decimal = PyObject_GetAttrString(mod_decimal, "Decimal");
-	Py_INCREF(type_decimal);
-	Py_DECREF(mod_decimal);
+    PyObject* mod_decimal = PyImport_ImportModule("decimal");
+    type_decimal = PyObject_GetAttrString(mod_decimal, "Decimal");
+    Py_INCREF(type_decimal);
+    Py_DECREF(mod_decimal);
 
     PyDateTime_IMPORT;
 }
@@ -118,7 +118,7 @@ static void *PyLongToINT64(JSOBJ _obj, JSONTypeContext *tc, void *outValue, size
 static void *PyFloatToDOUBLE(JSOBJ _obj, JSONTypeContext *tc, void *outValue, size_t *_outLen)
 {
     PyObject *obj = (PyObject *) _obj;
-	*((double *) outValue) = PyFloat_AsDouble (obj);
+    *((double *) outValue) = PyFloat_AsDouble (obj);
     return NULL;
 }
 
@@ -272,54 +272,54 @@ char *Tuple_iterGetName(JSOBJ obj, JSONTypeContext *tc, size_t *outLen)
 //=============================================================================
 void Iter_iterBegin(JSOBJ obj, JSONTypeContext *tc)
 {
-	GET_TC(tc)->itemValue = NULL;
-	GET_TC(tc)->iterator = PyObject_GetIter(obj);
+    GET_TC(tc)->itemValue = NULL;
+    GET_TC(tc)->iterator = PyObject_GetIter(obj);
 }
 
 int Iter_iterNext(JSOBJ obj, JSONTypeContext *tc)
 {
-	PyObject *item;
+    PyObject *item;
 
-	if (GET_TC(tc)->itemValue)
-	{
-		Py_DECREF(GET_TC(tc)->itemValue);
-		GET_TC(tc)->itemValue = NULL;
-	}    
+    if (GET_TC(tc)->itemValue)
+    {
+        Py_DECREF(GET_TC(tc)->itemValue);
+        GET_TC(tc)->itemValue = NULL;
+    }    
 
-	item = PyIter_Next(GET_TC(tc)->iterator);
+    item = PyIter_Next(GET_TC(tc)->iterator);
 
-	if (item == NULL)
-	{
-		return 0;
-	}
+    if (item == NULL)
+    {
+        return 0;
+    }
 
-	GET_TC(tc)->itemValue = item;
-	return 1;
+    GET_TC(tc)->itemValue = item;
+    return 1;
 }
 
 void Iter_iterEnd(JSOBJ obj, JSONTypeContext *tc)
 {
-	if (GET_TC(tc)->itemValue)
-	{
-		Py_DECREF(GET_TC(tc)->itemValue);
-		GET_TC(tc)->itemValue = NULL;
-	}
+    if (GET_TC(tc)->itemValue)
+    {
+        Py_DECREF(GET_TC(tc)->itemValue);
+        GET_TC(tc)->itemValue = NULL;
+    }
 
-	if (GET_TC(tc)->iterator)
-	{
-		Py_DECREF(GET_TC(tc)->iterator);
-		GET_TC(tc)->iterator = NULL;
-	}    
+    if (GET_TC(tc)->iterator)
+    {
+        Py_DECREF(GET_TC(tc)->iterator);
+        GET_TC(tc)->iterator = NULL;
+    }    
 }
 
 JSOBJ Iter_iterGetValue(JSOBJ obj, JSONTypeContext *tc)
 {
-	return GET_TC(tc)->itemValue;
+    return GET_TC(tc)->itemValue;
 }
 
 char *Iter_iterGetName(JSOBJ obj, JSONTypeContext *tc, size_t *outLen)
 {
-	return NULL;
+    return NULL;
 }
 
 //=============================================================================
@@ -591,7 +591,7 @@ void Object_beginTypeContext (JSOBJ _obj, JSONTypeContext *tc)
 
     if (PyIter_Check(obj))
     {
-		PRINTMARK();    
+        PRINTMARK();    
         goto ISITERABLE;
     }
 
@@ -645,7 +645,7 @@ void Object_beginTypeContext (JSOBJ _obj, JSONTypeContext *tc)
         return;
     }
     else
-						if (PyFloat_Check(obj) || PyObject_IsInstance(obj, type_decimal))
+    if (PyFloat_Check(obj) || PyObject_IsInstance(obj, type_decimal))
     {
         PRINTMARK();
         pc->PyTypeToJSON = PyFloatToDOUBLE; tc->type = JT_DOUBLE;
@@ -713,19 +713,18 @@ ISITERABLE:
         pc->iterGetName = Tuple_iterGetName;
         return;
     }
-											else
-												if (PyAnySet_Check(obj))
-												{
-													PRINTMARK();
-													tc->type = JT_ARRAY;
-													pc->iterBegin = Iter_iterBegin;
-													pc->iterEnd = Iter_iterEnd;
-													pc->iterNext = Iter_iterNext;
-													pc->iterGetValue = Iter_iterGetValue;
-													pc->iterGetName = Iter_iterGetName;
-													return;
-
-												}
+    else
+    if (PyAnySet_Check(obj))
+    {
+        PRINTMARK();
+        tc->type = JT_ARRAY;
+        pc->iterBegin = Iter_iterBegin;
+        pc->iterEnd = Iter_iterEnd;
+        pc->iterNext = Iter_iterNext;
+        pc->iterGetValue = Iter_iterGetValue;
+        pc->iterGetName = Iter_iterGetName;
+        return;
+     }
 
 
     toDictFunc = PyObject_GetAttrString(obj, "toDict");
@@ -764,7 +763,7 @@ ISITERABLE:
 
     PyErr_Clear();
 
-												PRINTMARK();    
+    PRINTMARK();
     tc->type = JT_OBJECT;
     pc->iterBegin = Dir_iterBegin;
     pc->iterEnd = Dir_iterEnd;
@@ -853,15 +852,15 @@ char *Object_iterGetName(JSOBJ obj, JSONTypeContext *tc, size_t *outLen)
 
 PyObject* objToJSON(PyObject* self, PyObject *args, PyObject *kwargs)
 {
-	static char *kwlist[] = { "obj", "ensure_ascii", "double_precision", "encode_html_chars", NULL};
+    static char *kwlist[] = { "obj", "ensure_ascii", "double_precision", "encode_html_chars", NULL};
 
     char buffer[65536];
     char *ret;
     PyObject *newobj;
     PyObject *oinput = NULL;
     PyObject *oensureAscii = NULL;
-	int idoublePrecision = 10; // default double precision setting
-	PyObject *oencodeHTMLChars = NULL;
+    int idoublePrecision = 10; // default double precision setting
+    PyObject *oencodeHTMLChars = NULL;
 
     JSONObjectEncoder encoder = 
     {
@@ -883,13 +882,13 @@ PyObject* objToJSON(PyObject* self, PyObject *args, PyObject *kwargs)
         -1, //recursionMax
         idoublePrecision,
         1, //forceAscii
-		0, //encodeHTMLChars
+        0, //encodeHTMLChars
     };
 
 
     PRINTMARK();
 
-	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|OiO", kwlist, &oinput, &oensureAscii, &idoublePrecision, &oencodeHTMLChars))
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|OiO", kwlist, &oinput, &oensureAscii, &idoublePrecision, &oencodeHTMLChars))
     {
         return NULL;
     }
@@ -900,10 +899,10 @@ PyObject* objToJSON(PyObject* self, PyObject *args, PyObject *kwargs)
         encoder.forceASCII = 0;
     }
 
-	if (oencodeHTMLChars != NULL && PyObject_IsTrue(oencodeHTMLChars))
-	{
-		encoder.encodeHTMLChars = 1;
-	}
+    if (oencodeHTMLChars != NULL && PyObject_IsTrue(oencodeHTMLChars))
+    {
+        encoder.encodeHTMLChars = 1;
+    }
 
     encoder.doublePrecision = idoublePrecision;
 

@@ -169,19 +169,19 @@ int Buffer_EscapeStringUnvalidated (JSONObjectEncoder *enc, const char *io, cons
         case '\r': (*of++) = '\\'; (*of++) = 'r'; break;
         case '\t': (*of++) = '\\'; (*of++) = 't'; break;
 
-		case 0x26: // '/'
-		case 0x3c: // '<'
-		case 0x3e: // '>'
-			if (enc->encodeHTMLChars)
-			{
-				// Fall through to \u00XX case below.
-			}
-			else
-			{
-				// Same as default case below.
-				(*of++) = (*io);
-				break;
-			}
+        case 0x26: // '/'
+        case 0x3c: // '<'
+        case 0x3e: // '>'
+            if (enc->encodeHTMLChars)
+            {
+                // Fall through to \u00XX case below.
+            }
+            else
+            {
+                // Same as default case below.
+                (*of++) = (*io);
+                break;
+            }
 
         case 0x01:
         case 0x02:
@@ -402,10 +402,10 @@ int Buffer_EscapeStringValidated (JSOBJ obj, JSONObjectEncoder *enc, const char 
                 io ++;
                 continue;
 
-			// This can never happen, it's here to make L4 VC++ happy
-			default: 
-				ucs = 0; 
-				break;
+            // This can never happen, it's here to make L4 VC++ happy
+            default: 
+                ucs = 0; 
+                break;
         }
 
         /*
