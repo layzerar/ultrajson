@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2011-2012, ESN Social Software AB and Jonas Tarnstrom
+Copyright (c) 2011-2013, ESN Social Software AB and Jonas Tarnstrom
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -24,11 +24,15 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-Portions of code from:
-MODP_ASCII - Ascii transformations (upper/lower, etc)
+
+Portions of code from MODP_ASCII - Ascii transformations (upper/lower, etc)
 http://code.google.com/p/stringencoders/
 Copyright (c) 2007  Nick Galbreath -- nickg [at] modp [dot] com. All rights reserved.
 
+Numeric decoder derived from from TCL library
+http://www.opensource.apple.com/source/tcl/tcl-14/tcl/license.terms
+ * Copyright (c) 1988-1993 The Regents of the University of California.
+ * Copyright (c) 1994 Sun Microsystems, Inc.
 */
 
 #include "ultrajson.h"
@@ -51,7 +55,6 @@ static const double g_pow10[] = {1, 10, 100, 1000, 10000, 100000, 1000000, 10000
 static const char g_hexChars[] = "0123456789abcdef";
 static const char g_escapeChars[] = "0123456789\\b\\t\\n\\f\\r\\\"\\\\\\/";
 
-
 /*
 FIXME: While this is fine dandy and working it's a magic value mess which probably only the author understands.
 Needs a cleanup and more documentation */
@@ -62,8 +65,8 @@ static const JSUINT8 g_asciiOutputTable[256] =
 {
 /* 0x00 */ 0, 30, 30, 30, 30, 30, 30, 30, 10, 12, 14, 30, 16, 18, 30, 30, 
 /* 0x10 */ 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30,
-/* 0x20 */ 1, 1, 20, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 24, 
-/* 0x30 */ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+/* 0x20 */ 1, 1, 20, 1, 1, 1, 29, 1, 1, 1, 1, 1, 1, 1, 1, 24,
+/* 0x30 */ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 29, 1, 29, 1,
 /* 0x40 */ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
 /* 0x50 */ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 22, 1, 1, 1,
 /* 0x60 */ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
@@ -132,11 +135,11 @@ FASTCALL_ATTR INLINE_PREFIX void FASTCALL_MSVC Buffer_AppendShortHexUnchecked (c
     *(outputOffset++) = g_hexChars[(value & 0x000f) >> 0];
 }
 
-int Buffer_EscapeStringUnvalidated (JSOBJ obj, JSONObjectEncoder *enc, const char *io, const char *end)
+int Buffer_EscapeStringUnvalidated (JSONObjectEncoder *enc, const char *io, const char *end)
 {
     char *of = (char *) enc->offset;
 
-    while (1)
+    for (;;)
     {
         switch (*io)
         {
@@ -165,6 +168,20 @@ int Buffer_EscapeStringUnvalidated (JSOBJ obj, JSONObjectEncoder *enc, const cha
         case '\n': (*of++) = '\\'; (*of++) = 'n'; break;
         case '\r': (*of++) = '\\'; (*of++) = 'r'; break;
         case '\t': (*of++) = '\\'; (*of++) = 't'; break;
+
+		case 0x26: // '/'
+		case 0x3c: // '<'
+		case 0x3e: // '>'
+			if (enc->encodeHTMLChars)
+			{
+				// Fall through to \u00XX case below.
+			}
+			else
+			{
+				// Same as default case below.
+				(*of++) = (*io);
+				break;
+			}
 
         case 0x01:
         case 0x02:
@@ -205,25 +222,14 @@ int Buffer_EscapeStringUnvalidated (JSOBJ obj, JSONObjectEncoder *enc, const cha
 
         io++;
     }
-
-    return FALSE;
 }
 
-
-/*
-FIXME:
-This code only works with Little and Big Endian
-
-FIXME: The JSON spec says escape "/" but non of the others do and we don't 
-want to be left alone doing it so we don't :)
-
-*/
 int Buffer_EscapeStringValidated (JSOBJ obj, JSONObjectEncoder *enc, const char *io, const char *end)
 {
     JSUTF32 ucs;
     char *of = (char *) enc->offset;
 
-    while (1)
+    for (;;)
     {
 
         //JSUINT8 chr = (unsigned char) *io;
@@ -360,6 +366,18 @@ int Buffer_EscapeStringValidated (JSOBJ obj, JSONObjectEncoder *enc, const char 
                 SetError (obj, enc, "Unsupported UTF-8 sequence length when encoding string");
                 return FALSE;
 
+            case 29:
+                if (enc->encodeHTMLChars)
+                {
+                    // Fall through to \u00XX case 30 below.
+                }
+                else
+                {
+                    // Same as case 1 above.
+                    *(of++) = (*io++);
+                    continue;
+                }
+
             case 30:
                 // \uXXXX encode
                 *(of++) = '\\';
@@ -383,6 +401,11 @@ int Buffer_EscapeStringValidated (JSOBJ obj, JSONObjectEncoder *enc, const char 
                 *(of++) = *( (char *) (g_escapeChars + utflen + 1));
                 io ++;
                 continue;
+
+			// This can never happen, it's here to make L4 VC++ happy
+			default: 
+				ucs = 0; 
+				break;
         }
 
         /*
@@ -392,28 +415,26 @@ int Buffer_EscapeStringValidated (JSOBJ obj, JSONObjectEncoder *enc, const char 
             ucs -= 0x10000;
             *(of++) = '\\';
             *(of++) = 'u';
-            Buffer_AppendShortHexUnchecked(of, (ucs >> 10) + 0xd800);
+            Buffer_AppendShortHexUnchecked(of, (unsigned short) (ucs >> 10) + 0xd800);
             of += 4;
 
             *(of++) = '\\';
             *(of++) = 'u';
-            Buffer_AppendShortHexUnchecked(of, (ucs & 0x3ff) + 0xdc00);
+            Buffer_AppendShortHexUnchecked(of, (unsigned short) (ucs & 0x3ff) + 0xdc00);
             of += 4;
         }
         else
         {
             *(of++) = '\\';
             *(of++) = 'u';
-            Buffer_AppendShortHexUnchecked(of, ucs);
+            Buffer_AppendShortHexUnchecked(of, (unsigned short) ucs);
             of += 4;
         }
     }
-
-    return FALSE;
 }
 
 #define Buffer_Reserve(__enc, __len) \
-    if ((__enc)->end - (__enc)->offset < (__len))  \
+    if ( (size_t) ((__enc)->end - (__enc)->offset) < (size_t) (__len))  \
     {   \
         Buffer_Realloc((__enc), (__len));\
     }   \
@@ -529,7 +550,11 @@ int Buffer_AppendDoubleUnchecked(JSOBJ obj, JSONObjectEncoder *enc, double value
     */
     if (value > thres_max) 
     {
-        enc->offset += sprintf(str, "%.15e", neg ? -value : value);
+#ifdef _WIN32
+        enc->offset += sprintf_s(str, enc->end - enc->offset, "%.15e", neg ? -value : value);
+#else
+        enc->offset += snprintf(str, enc->end - enc->offset, "%.15e", neg ? -value : value);
+#endif
         return TRUE;
     }
 
@@ -659,7 +684,7 @@ void encode(JSOBJ obj, JSONObjectEncoder *enc, const char *name, size_t cbName)
         }
         else
         {
-            if (!Buffer_EscapeStringUnvalidated(obj, enc, name, name + cbName))
+            if (!Buffer_EscapeStringUnvalidated(enc, name, name + cbName))
             {
                 return;
             }
@@ -815,7 +840,7 @@ void encode(JSOBJ obj, JSONObjectEncoder *enc, const char *name, size_t cbName)
             }
             else
             {
-                if (!Buffer_EscapeStringUnvalidated(obj, enc, value, value + szlen))
+                if (!Buffer_EscapeStringUnvalidated(enc, value, value + szlen))
                 {
                     enc->endTypeContext(obj, &tc);
                     enc->level --;

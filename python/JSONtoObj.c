@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2011-2012, ESN Social Software AB and Jonas Tarnstrom
+Copyright (c) 2011-2013, ESN Social Software AB and Jonas Tarnstrom
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -24,18 +24,23 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-Portions of code from:
-MODP_ASCII - Ascii transformations (upper/lower, etc)
+
+Portions of code from MODP_ASCII - Ascii transformations (upper/lower, etc)
 http://code.google.com/p/stringencoders/
 Copyright (c) 2007  Nick Galbreath -- nickg [at] modp [dot] com. All rights reserved.
 
+Numeric decoder derived from from TCL library
+http://www.opensource.apple.com/source/tcl/tcl-14/tcl/license.terms
+ * Copyright (c) 1988-1993 The Regents of the University of California.
+ * Copyright (c) 1994 Sun Microsystems, Inc.
 */
 
 #include "py_defines.h"
 #include <ultrajson.h>
 
 
-
+//#define PRINTMARK() fprintf(stderr, "%s: MARK(%d)\n", __FILE__, __LINE__)
+#define PRINTMARK()
 
 void Object_objectAddKey(JSOBJ obj, JSOBJ name, JSOBJ value)
 {
@@ -102,12 +107,14 @@ static void Object_releaseObject(JSOBJ obj)
     Py_DECREF( ((PyObject *)obj));
 }
 
+static char *g_kwlist[] = {"obj", "precise_float", NULL};
 
-
-PyObject* JSONToObj(PyObject* self, PyObject *arg)
+PyObject* JSONToObj(PyObject* self, PyObject *args, PyObject *kwargs)
 {
     PyObject *ret;
     PyObject *sarg;
+	PyObject *arg;
+	PyObject *opreciseFloat = NULL;
     JSONObjectDecoder decoder = 
     {
         Object_newString,
@@ -126,6 +133,18 @@ PyObject* JSONToObj(PyObject* self, PyObject *arg)
         PyObject_Free,
         PyObject_Realloc
     };
+
+	decoder.preciseFloat = 0;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|O", g_kwlist, &arg, &opreciseFloat))
+    {
+        return NULL;
+    }
+
+    if (opreciseFloat && PyObject_IsTrue(opreciseFloat))
+    {
+        decoder.preciseFloat = 1;
+    }
 
     if (PyString_Check(arg))
     {
@@ -175,11 +194,18 @@ PyObject* JSONToObj(PyObject* self, PyObject *arg)
     return ret;
 }
 
-PyObject* JSONFileToObj(PyObject* self, PyObject *file)
+PyObject* JSONFileToObj(PyObject* self, PyObject *args, PyObject *kwargs)
 {
     PyObject *read;
     PyObject *string;
     PyObject *result;
+	PyObject *file = NULL;
+	PyObject *argtuple;
+
+	if (!PyArg_ParseTuple (args, "O", &file)) 
+	{
+        return NULL;
+    }
 
     if (!PyObject_HasAttrString (file, "read"))
     {
@@ -203,8 +229,12 @@ PyObject* JSONFileToObj(PyObject* self, PyObject *file)
         return NULL;
     }
 
-    result = JSONToObj (self, string);
-    Py_XDECREF(string);
+	argtuple = PyTuple_Pack(1, string);
+
+    result = JSONToObj (self, argtuple, kwargs);
+
+	Py_XDECREF(argtuple);
+	Py_XDECREF(string);
 
     if (result == NULL) {
         return NULL;

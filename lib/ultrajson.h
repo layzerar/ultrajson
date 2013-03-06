@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2011-2012, ESN Social Software AB and Jonas Tarnstrom
+Copyright (c) 2011-2013, ESN Social Software AB and Jonas Tarnstrom
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -24,11 +24,15 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-Portions of code from:
-MODP_ASCII - Ascii transformations (upper/lower, etc)
+
+Portions of code from MODP_ASCII - Ascii transformations (upper/lower, etc)
 http://code.google.com/p/stringencoders/
 Copyright (c) 2007  Nick Galbreath -- nickg [at] modp [dot] com. All rights reserved.
 
+Numeric decoder derived from from TCL library
+http://www.opensource.apple.com/source/tcl/tcl-14/tcl/license.terms
+ * Copyright (c) 1988-1993 The Regents of the University of California.
+ * Copyright (c) 1994 Sun Microsystems, Inc.
 */
 
 /*
@@ -50,8 +54,6 @@ tree doesn't have cyclic references.
 
 #include <stdio.h>
 #include <wchar.h>
-
-//#define JSON_DECODE_NUMERIC_AS_DOUBLE
 
 // Don't output any extra whitespaces when encoding
 #define JSON_NO_EXTRA_WHITESPACE
@@ -92,20 +94,20 @@ typedef __int64 JSLONG;
 
 #else
 
-#include <sys/types.h>
+#include <stdint.h>
 typedef int64_t JSINT64;
-typedef u_int64_t JSUINT64;
+typedef uint64_t JSUINT64;
 
 typedef int32_t JSINT32;
-typedef u_int32_t JSUINT32;
+typedef uint32_t JSUINT32;
 
 #define FASTCALL_MSVC 
 #define FASTCALL_ATTR __attribute__((fastcall))
 #define INLINE_PREFIX inline
 
-typedef u_int8_t JSUINT8;
-typedef u_int16_t JSUTF16;
-typedef u_int32_t JSUTF32;
+typedef uint8_t JSUINT8;
+typedef uint16_t JSUTF16;
+typedef uint32_t JSUTF32;
 
 typedef int64_t JSLONG;
 
@@ -192,13 +194,13 @@ typedef struct __JSONObjectEncoder
     The is responsible for the life-cycle of the returned string. Use iterNext/iterEnd and ti->prv to keep track of current object
     */
     JSPFN_ITERGETVALUE iterGetValue;
-    
+
     /*
     Return name of iterator. 
     The is responsible for the life-cycle of the returned string. Use iterNext/iterEnd and ti->prv to keep track of current object
     */
     JSPFN_ITERGETNAME iterGetName;
-    
+
     /*
     Release a value as indicated by setting ti->release = 1 in the previous getValue call.
     The ti->prv array should contain the necessary context to release the value
@@ -223,6 +225,9 @@ typedef struct __JSONObjectEncoder
     If true output will be ASCII with all characters above 127 encoded as \uXXXX. If false output will be UTF-8 or what ever charset strings are brought as */
     int forceASCII;
 
+	/*
+	If true, '<', '>', and '&' characters will be encoded as \u003c, \u003e, and \u0026, respectively. If false, no special encoding will be used. */
+	int encodeHTMLChars;
 
     /*
     Set to an error message if error occured */
@@ -283,6 +288,7 @@ typedef struct __JSONObjectDecoder
     char *errorStr;
     char *errorOffset;
 
+	int preciseFloat;
 
 
 } JSONObjectDecoder;

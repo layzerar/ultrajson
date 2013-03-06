@@ -1,17 +1,17 @@
 /*
-Copyright (c) 2011-2012, ESN Social Software AB and Jonas Tarnstrom
+Copyright (c) 2011-2013, ESN Social Software AB and Jonas Tarnstrom
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
-    * Redistributions of source code must retain the above copyright
-      notice, this list of conditions and the following disclaimer.
-    * Redistributions in binary form must reproduce the above copyright
-      notice, this list of conditions and the following disclaimer in the
-      documentation and/or other materials provided with the distribution.
-    * Neither the name of the ESN Social Software AB nor the
-      names of its contributors may be used to endorse or promote products
-      derived from this software without specific prior written permission.
+* Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+* Redistributions in binary form must reproduce the above copyright
+notice, this list of conditions and the following disclaimer in the
+documentation and/or other materials provided with the distribution.
+* Neither the name of the ESN Social Software AB nor the
+names of its contributors may be used to endorse or promote products
+derived from this software without specific prior written permission.
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
 ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -24,11 +24,15 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-Portions of code from:
-MODP_ASCII - Ascii transformations (upper/lower, etc)
+
+Portions of code from MODP_ASCII - Ascii transformations (upper/lower, etc)
 http://code.google.com/p/stringencoders/
 Copyright (c) 2007  Nick Galbreath -- nickg [at] modp [dot] com. All rights reserved.
 
+Numeric decoder derived from from TCL library
+http://www.opensource.apple.com/source/tcl/tcl-14/tcl/license.terms
+* Copyright (c) 1988-1993 The Regents of the University of California.
+* Copyright (c) 1994 Sun Microsystems, Inc.
 */
 
 #include "py_defines.h"
@@ -37,6 +41,7 @@ Copyright (c) 2007  Nick Galbreath -- nickg [at] modp [dot] com. All rights rese
 #include <ultrajson.h>
 
 #define EPOCH_ORD 719163
+static PyObject* type_decimal;
 
 typedef void *(*PFN_PyTypeToJSON)(JSOBJ obj, JSONTypeContext *ti, void *outValue, size_t *_outLen);
 
@@ -61,6 +66,7 @@ typedef struct __TypeContext
     PyObject *itemValue;
     PyObject *itemName;
     PyObject *attrList;
+	PyObject *iterator;
 
     JSINT64 longValue;
 
@@ -81,6 +87,11 @@ struct PyDictIterState
 
 void initObjToJSON(void)
 {
+	PyObject* mod_decimal = PyImport_ImportModule("decimal");
+	type_decimal = PyObject_GetAttrString(mod_decimal, "Decimal");
+	Py_INCREF(type_decimal);
+	Py_DECREF(mod_decimal);
+
     PyDateTime_IMPORT;
 }
 
@@ -107,7 +118,7 @@ static void *PyLongToINT64(JSOBJ _obj, JSONTypeContext *tc, void *outValue, size
 static void *PyFloatToDOUBLE(JSOBJ _obj, JSONTypeContext *tc, void *outValue, size_t *_outLen)
 {
     PyObject *obj = (PyObject *) _obj;
-    *((double *) outValue) = PyFloat_AS_DOUBLE (obj);
+	*((double *) outValue) = PyFloat_AsDouble (obj);
     return NULL;
 }
 
@@ -256,6 +267,62 @@ char *Tuple_iterGetName(JSOBJ obj, JSONTypeContext *tc, size_t *outLen)
 }
 
 //=============================================================================
+// Iterator iteration functions 
+// itemValue is borrowed reference, no ref counting
+//=============================================================================
+void Iter_iterBegin(JSOBJ obj, JSONTypeContext *tc)
+{
+	GET_TC(tc)->itemValue = NULL;
+	GET_TC(tc)->iterator = PyObject_GetIter(obj);
+}
+
+int Iter_iterNext(JSOBJ obj, JSONTypeContext *tc)
+{
+	PyObject *item;
+
+	if (GET_TC(tc)->itemValue)
+	{
+		Py_DECREF(GET_TC(tc)->itemValue);
+		GET_TC(tc)->itemValue = NULL;
+	}    
+
+	item = PyIter_Next(GET_TC(tc)->iterator);
+
+	if (item == NULL)
+	{
+		return 0;
+	}
+
+	GET_TC(tc)->itemValue = item;
+	return 1;
+}
+
+void Iter_iterEnd(JSOBJ obj, JSONTypeContext *tc)
+{
+	if (GET_TC(tc)->itemValue)
+	{
+		Py_DECREF(GET_TC(tc)->itemValue);
+		GET_TC(tc)->itemValue = NULL;
+	}
+
+	if (GET_TC(tc)->iterator)
+	{
+		Py_DECREF(GET_TC(tc)->iterator);
+		GET_TC(tc)->iterator = NULL;
+	}    
+}
+
+JSOBJ Iter_iterGetValue(JSOBJ obj, JSONTypeContext *tc)
+{
+	return GET_TC(tc)->itemValue;
+}
+
+char *Iter_iterGetName(JSOBJ obj, JSONTypeContext *tc, size_t *outLen)
+{
+	return NULL;
+}
+
+//=============================================================================
 // Dir iteration functions 
 // itemName ref is borrowed from PyObject_Dir (attrList). No refcount
 // itemValue ref is from PyObject_GetAttr. Ref counted
@@ -358,7 +425,7 @@ int Dir_iterNext(JSOBJ _obj, JSONTypeContext *tc)
     GET_TC(tc)->itemName = itemName;
     GET_TC(tc)->itemValue = itemValue;
     GET_TC(tc)->index ++;
-    
+
     PRINTMARK();
     return 1;
 }
@@ -521,9 +588,10 @@ void Object_beginTypeContext (JSOBJ _obj, JSONTypeContext *tc)
     pc->index = 0;
     pc->size = 0;
     pc->longValue = 0;
-    
+
     if (PyIter_Check(obj))
     {
+		PRINTMARK();    
         goto ISITERABLE;
     }
 
@@ -577,7 +645,7 @@ void Object_beginTypeContext (JSOBJ _obj, JSONTypeContext *tc)
         return;
     }
     else
-    if (PyFloat_Check(obj))
+						if (PyFloat_Check(obj) || PyObject_IsInstance(obj, type_decimal))
     {
         PRINTMARK();
         pc->PyTypeToJSON = PyFloatToDOUBLE; tc->type = JT_DOUBLE;
@@ -607,7 +675,6 @@ void Object_beginTypeContext (JSOBJ _obj, JSONTypeContext *tc)
 
 
 ISITERABLE:
-
     if (PyDict_Check(obj))
     {
         PRINTMARK();
@@ -646,6 +713,19 @@ ISITERABLE:
         pc->iterGetName = Tuple_iterGetName;
         return;
     }
+											else
+												if (PyAnySet_Check(obj))
+												{
+													PRINTMARK();
+													tc->type = JT_ARRAY;
+													pc->iterBegin = Iter_iterBegin;
+													pc->iterEnd = Iter_iterEnd;
+													pc->iterNext = Iter_iterNext;
+													pc->iterGetValue = Iter_iterGetValue;
+													pc->iterGetName = Iter_iterGetName;
+													return;
+
+												}
 
 
     toDictFunc = PyObject_GetAttrString(obj, "toDict");
@@ -684,6 +764,7 @@ ISITERABLE:
 
     PyErr_Clear();
 
+												PRINTMARK();    
     tc->type = JT_OBJECT;
     pc->iterBegin = Dir_iterBegin;
     pc->iterEnd = Dir_iterEnd;
@@ -772,14 +853,15 @@ char *Object_iterGetName(JSOBJ obj, JSONTypeContext *tc, size_t *outLen)
 
 PyObject* objToJSON(PyObject* self, PyObject *args, PyObject *kwargs)
 {
-    static char *kwlist[] = { "obj", "ensure_ascii", "double_precision", NULL};
+	static char *kwlist[] = { "obj", "ensure_ascii", "double_precision", "encode_html_chars", NULL};
 
     char buffer[65536];
     char *ret;
     PyObject *newobj;
     PyObject *oinput = NULL;
     PyObject *oensureAscii = NULL;
-    int idoublePrecision = 5; // default double precision setting
+	int idoublePrecision = 10; // default double precision setting
+	PyObject *oencodeHTMLChars = NULL;
 
     JSONObjectEncoder encoder = 
     {
@@ -801,21 +883,27 @@ PyObject* objToJSON(PyObject* self, PyObject *args, PyObject *kwargs)
         -1, //recursionMax
         idoublePrecision,
         1, //forceAscii
+		0, //encodeHTMLChars
     };
 
 
     PRINTMARK();
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|Oi", kwlist, &oinput, &oensureAscii, &idoublePrecision))
+	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|OiO", kwlist, &oinput, &oensureAscii, &idoublePrecision, &oencodeHTMLChars))
     {
         return NULL;
     }
 
-    
+
     if (oensureAscii != NULL && !PyObject_IsTrue(oensureAscii))
     {
         encoder.forceASCII = 0;
     }
+
+	if (oencodeHTMLChars != NULL && PyObject_IsTrue(oencodeHTMLChars))
+	{
+		encoder.encodeHTMLChars = 1;
+	}
 
     encoder.doublePrecision = idoublePrecision;
 
@@ -912,7 +1000,7 @@ PyObject* objToJSONFile(PyObject* self, PyObject *args, PyObject *kwargs)
     PRINTMARK();
 
     Py_RETURN_NONE;
-    
+
 
 }
 
